@@ -1,1 +1,44 @@
-123
+name: Generate firmware manifest
+
+on:
+  release:
+    types: [published]  # run when you publish a new release
+
+jobs:
+  build-manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const release = context.payload.release;
+            core.setOutput('tag_name', release.tag_name);
+            core.setOutput('version', release.tag_name); // or parse your own version
+            // assume single firmware asset
+            const asset = release.assets[0];
+            core.setOutput('asset_url', asset.browser_download_url);
+
+      - name: Create manifest.json
+        run: |
+          cat > manifest.json <<EOF
+          {
+            "version": "${{ steps.release.outputs.version }}",
+            "tag": "${{ steps.release.outputs.tag_name }}",
+            "asset_url": "${{ steps.release.outputs.asset_url }}"
+          }
+          EOF
+
+      - name: Commit manifest.json
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: "manifest.json"
+          message: "Update firmware manifest for ${{ steps.release.outputs.tag_name }}"
+          author_name: "github-actions"
+          author_email: "actions@github.com"
